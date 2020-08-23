@@ -1,10 +1,11 @@
 import sys
 import typing as t
-from . import structures
 
 import numpy as np
 
 import tdt
+
+from . import structures
 
 # Offset in the filtered["time ranges"] for start and end of the time ranges included
 #  via a filtering search
@@ -45,7 +46,41 @@ class SessionProcessor:
 
     def __init__(self, *, block_path: str):
         self.block_path = block_path
-        self.block_data = tdt.read_block(self.block_path, evtype=["epocs", "snips", "scalars"], nodata=1)
+        self._block_data = tdt.read_block(self.block_path, evtype=["epocs", "snips", "scalars"], nodata=1)
+
+    def get_parameter_summary(self) -> str:
+        """Return a summary of the current configuration of the Session Processor"""
+        summary_fields: t.Dict[str, t.List[str]] = {
+            "Tones": ["tone_duration", "inter_tone_interval"],
+            "Offsets": [
+                "in_tone_capture_start_offset",
+                "in_tone_capture_end_offset",
+                "out_tone_capture_start_offset",
+                "out_tone_capture_end_offset",
+            ],
+            "Epochs epochs": [
+                "trial_epoch",
+                "stimulus_epoch",
+                "attenuation_epoch",
+                "accoustic_frequency_epoch",
+                "reference_channels_bitmask_epoch",
+                "stimulation_channels_bitmask_epoch",
+                "stimulation_current_epoch",
+                "stimulation_frequency_epoch",
+            ],
+            "Block": ["block_path"],
+        }
+
+        output: t.List[str] = []
+        for heading, fields in summary_fields.items():
+            if output:
+                output.append("\n")
+            output.append(heading.upper())
+            output.append("-" * len(heading))
+            for field in fields:
+                output.append(f"{field.replace('_', ' ').title()}: {getattr(self, field)}")
+
+        return "\n".join(output)
 
     def set_tone_parameters(self, *, tone_duration: float, inter_tone_interval: float) -> None:
         """Set duration and interval of the presented tones
@@ -98,6 +133,28 @@ class SessionProcessor:
         stimulation_current_epoch: t.Optional[str] = None,
         stimulation_frequency_epoch: t.Optional[str] = None,
     ) -> None:
+        """Replace the epoch name for one or more session epoch. Any epochs not specified
+            are not replaced.
+        
+        Parameters
+        ----------
+        trial_epoch : 
+            Name of epoch representing trial count and duration
+        stimulus_epoch :
+            Name of epoch representing stimulus count and duration
+        attenuation_epoch :
+            Name of epoch containing accoustic tone attenuation
+        accoustic_frequency_epoch : 
+            Name of epoch containing accoustic tone frequency
+        reference_channels_bitmask_epoch : 
+            Name of epoch containing neural reference channels bitmask
+        stimulation_channels_bitmask_epoch : 
+            Name of epoch containing neural stimulation channels bitmask
+        stimulation_current_epoch : 
+            Name of epoch containing neural stimulation current
+        stimulation_frequency_epoch : 
+            Name of epoch containing neural stimulation frequency
+        """
         self.trial_epoch = trial_epoch or self.trial_epoch
         self.stimulus_epoch = stimulus_epoch or self.stimulus_epoch
         self.attenuation_epoch = attenuation_epoch or self.attenuation_epoch
@@ -110,7 +167,7 @@ class SessionProcessor:
         )
         self.stimulation_current_epoch = stimulation_current_epoch or self.stimulation_current_epoch
 
-    def extract_spikes_from_trial(self, *, from_trial_offest: float, to_trial_offset: float) -> structures.Session:
+    def extract_spikes_from_trial(self, *, from_trial_offset: float, to_trial_offset: float) -> structures.Session:
         """
         Extracts spike counts for each tone of each trial in the session
 
@@ -129,8 +186,11 @@ class SessionProcessor:
         """
         tones_per_second: float = 1 / (self.tone_duration + self.inter_tone_interval)
         trial_windows = tdt.epoc_filter(
-            self.block_data, "TriS", t=[from_trial_offest, to_trial_offset - from_trial_offset]
+            self._block_data, "TriS", t=[from_trial_offset, to_trial_offset - from_trial_offset]
         )
+
+        
+
 
         # Skip the last tone as the end offset should always go a little past the end
         # tone_count_to_include = int(((end_offset - start_offset) * tones_per_second) - 1)
@@ -140,9 +200,16 @@ class SessionProcessor:
         cspk_length = len(cspk_data["ts"])
         np.set_printoptions(threshold=sys.maxsize)
 
-        for trial_number, trial_start_timestamp, trial_end_timestamp in enumerate(
-            zip(trial_windows["time_ranges"][TIME_RANGE_ONSET_IDX], trial_windows["time_ranges"][TIME_RANGE_OFFSET_IDX])
+        for trial_number, trial_start_timestamp, trial_end_timestamp in (
+            (idx, times[0], times[1])
+            for idx, times in enumerate(
+                zip(
+                    trial_windows["time_ranges"][TIME_RANGE_ONSET_IDX],
+                    trial_windows["time_ranges"][TIME_RANGE_OFFSET_IDX],
+                )
+            )
         ):
+
             in_tone_data = np.zeros((tones_to_include * 2, 32), np.uint)
             # out_tone_data = np.zeros((tones_to_include, 32), np.uint)
             for tone_number, tone_offset in enumerate(

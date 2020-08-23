@@ -1,3 +1,6 @@
+"""
+Data structures for representing the processed data from testing/trials
+"""
 import typing as t
 
 import numpy as np
@@ -23,7 +26,7 @@ class Tone:
 
     tone_start_timestamp: float
     tone_end_timestamp: float
-    inter_tone_interval_end_timestamps: float
+    inter_tone_interval_end_timestamp: float
     frequency: int
     amplitude: int
 
@@ -32,6 +35,8 @@ class Trial:
     """Basic structure for a trial in a session"""
 
     trial_number: int
+    start_timestamp: float
+    end_timestamp: float
     excluded: bool
     base_frequency: int
     alternate_frequency: int
@@ -42,8 +47,8 @@ class Trial:
 class IncludedTrial(Trial):
     """Holds data for a single trial of a session"""
 
-    in_tone_spike_counts: t.List[np.nparray] = []
-    out_tone_spike_counts: t.List[np.nparray] = []
+    in_tone_spike_counts: t.List[np.array] = []
+    out_tone_spike_counts: t.List[np.array] = []
 
 
 class ExcludedTrial(Trial):
@@ -57,6 +62,13 @@ class Session:
 
     @property
     def trial_count(self) -> int:
+        """Get the number of trials in the session
+
+        Returns
+        -------
+        int
+            Number of trials in the session
+        """
         return len(self.trials_data)
 
     trials_data: t.List[t.Type[Trial]] = []

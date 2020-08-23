@@ -10,7 +10,7 @@ def format(ctx):
     Apply automatic code formating tools
     """
     ctx.run("black src")
-    ctx.run("isort ")
+    ctx.run("isort .")
 
 
 @invoke.task
