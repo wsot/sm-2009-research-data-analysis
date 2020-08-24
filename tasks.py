@@ -35,3 +35,10 @@ def check(ctx):
     Runs all the code checking tools
     """
     ...
+
+@invoke.task
+def lab(ctx):
+    """
+    Start Jupyter Lab
+    """
+    ctx.run("jupyter lab")
