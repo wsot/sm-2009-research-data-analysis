@@ -9,7 +9,6 @@ import tdt
 
 from . import structures, utils
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -203,9 +202,11 @@ class SessionProcessor:
 
         """
         tones_per_second: float = 1 / (self.tone_duration + self.inter_tone_interval)
-        if not self._block_data:
+
+        if self._block_data is None:
             self._block_data = tdt.read_block(self.block_path, evtype=["epocs", "snips", "scalars"], nodata=1)
-        if not self._trial_windows:
+            
+        if self._trial_windows is None:
             with utils.timer(label="TDT epoc_filter", logger=logger):
                 self._trial_windows = tdt.epoc_filter(
                     self._block_data, "TriS", t=[from_trial_offset, to_trial_offset - from_trial_offset]
@@ -251,7 +252,7 @@ class SessionProcessor:
                 )
             )
         ):
-            logger.debug(
+            logger.info(
                 "Starting processing of trial number %s, start timestamp %s, end timestamp %s",
                 trial_number,
                 trial_start_timestamp,
@@ -268,7 +269,7 @@ class SessionProcessor:
             while stimulus_epoch_onsets[stimulus_epoch_idx] < trial_start_timestamp:
                 stimulus_epoch_idx += 1
 
-            logger.debug(
+            logger.info(
                 "Found first stimulus onset after trial start: stimulus_epoch_idx: %s, timestamp: %s",
                 stimulus_epoch_idx,
                 stimulus_epoch_onsets[stimulus_epoch_idx],
@@ -276,7 +277,7 @@ class SessionProcessor:
 
             while (
                 stimulus_epoch_idx < total_stimulus_count
-                and stimulus_epoch_onsets[stimulus_epoch_idx] < trial_end_timestamp
+                and stimulus_epoch_offsets[stimulus_epoch_idx] < trial_end_timestamp
             ):
                 logger.debug(
                     "Processing stimulus: stimulus_epoch_idx: %s, timestamp: %s",
@@ -332,50 +333,52 @@ class SessionProcessor:
                 )
 
                 stimulus_epoch_idx += 1
-                trial.tones_data.append(tone)
+                trial.tones.append(tone)
 
-            session.trials_data.append(trial)
+            session.trials.append(trial)
 
-            # in_tone_data = np.zeros((tones_to_include * 2, 32), np.uint)
-            # # out_tone_data = np.zeros((tones_to_include, 32), np.uint)
-            # for tone_number, tone_offset in enumerate(
-            #     filter(
-            #         lambda x: (
-            #             trial_windows["time_ranges"][TIME_RANGE_ONSET_IDX][trial_number]
-            #             < x
-            #             < trial_windows["time_ranges"][TIME_RANGE_OFFSET_IDX][trial_number]
-            #         ),
-            #         trial_windows["epocs"]["StiS"]["onset"],
-            #     )
-            # ):
-            #     if tone_number >= tones_to_include:
-            #         continue
+#            for trial in session.trials:
 
-            #     spike_cumulator_range = strictures.SpikeAccumulatorTimeRange(
-            #         start=tone_offset + self.in_tone_capture_start_offset,
-            #         end=tone_offset + self.in_tone_capture_end_offset,
-            #     )
-            #     while cspk_data["ts"][cspk_offset] < spike_cumulator_range.start:
-            #         cspk_offset += 1
+        #             in_tone_data = np.zeros((tones_to_include * 2, 32), np.uint)
+        #             # out_tone_data = np.zeros((tones_to_include, 32), np.uint)
+        #             for tone_number, tone_offset in enumerate(
+        #                 filter(
+        #                     lambda x: (
+        #                         trial_windows["time_ranges"][TIME_RANGE_ONSET_IDX][trial_number]
+        #                         < x
+        #                         < trial_windows["time_ranges"][TIME_RANGE_OFFSET_IDX][trial_number]
+        #                     ),
+        #                     trial_windows["epocs"]["StiS"]["onset"],
+        #                 )
+        #             ):
+        #                 if tone_number >= tones_to_include:
+        #                     continue
 
-            #     while cspk_data["ts"][cspk_offset] < spike_cumulator_range.end:
-            #         in_tone_data[tone_number * 2, cspk_data["chan"][cspk_offset][0] - 1] += 1
-            #         cspk_offset += 1
+        #                 spike_cumulator_range = strictures.SpikeAccumulatorTimeRange(
+        #                     start=tone_offset + self.in_tone_capture_start_offset,
+        #                     end=tone_offset + self.in_tone_capture_end_offset,
+        #                 )
+        #                 while cspk_data["ts"][cspk_offset] < spike_cumulator_range.start:
+        #                     cspk_offset += 1
 
-            #     spike_cumulator_range = structures.SpikeAccumulatorTimeRange(
-            #         start=tone_offset + self.tone_duration + self.out_tone_capture_start_offset,
-            #         end=tone_offset + self.tone_duration + self.out_tone_capture_end_offset,
-            #     )
-            #     while cspk_data["ts"][cspk_offset] < spike_cumulator_range.start:
-            #         cspk_offset += 1
+        #                 while cspk_data["ts"][cspk_offset] < spike_cumulator_range.end:
+        #                     in_tone_data[tone_number * 2, cspk_data["chan"][cspk_offset][0] - 1] += 1
+        #                     cspk_offset += 1
 
-            #     while cspk_data["ts"][cspk_offset] < spike_cumulator_range.end:
-            #         in_tone_data[tone_number * 2 + 1, cspk_data["chan"][cspk_offset][0] - 1] += 1
-            #         cspk_offset += 1
+        #                 spike_cumulator_range = structures.SpikeAccumulatorTimeRange(
+        #                     start=tone_offset + self.tone_duration + self.out_tone_capture_start_offset,
+        #                     end=tone_offset + self.tone_duration + self.out_tone_capture_end_offset,
+        #                 )
+        #                 while cspk_data["ts"][cspk_offset] < spike_cumulator_range.start:
+        #                     cspk_offset += 1
 
-            # # print(in_tone_data)
-            # # plt.rcParams["figure.figsize"] = [100 / 2.54, 80 / 2.54]
-            # # plt.imshow(in_tone_data, cmap="hot", interpolation="nearest")
-            # # plt.show()
+        #                 while cspk_data["ts"][cspk_offset] < spike_cumulator_range.end:
+        #                     in_tone_data[tone_number * 2 + 1, cspk_data["chan"][cspk_offset][0] - 1] += 1
+        #                     cspk_offset += 1
+
+        # # print(in_tone_data)
+        # # plt.rcParams["figure.figsize"] = [100 / 2.54, 80 / 2.54]
+        # # plt.imshow(in_tone_data, cmap="hot", interpolation="nearest")
+        # # plt.show()
 
         return session

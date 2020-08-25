@@ -18,4 +18,4 @@ import contextlib
 def timer(label: str, logger: logging.Logger) -> None:
     start_time = datetime.now()
     yield
-    logger.debug("Time for %s: %s", label, datetime.now() - start_time)
+    logger.info("Time for %s: %s", label, datetime.now() - start_time)

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import nptyping as npt
 import numpy as np
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +47,7 @@ class Trial:
     base_frequency: int
     alternate_frequency: int
     amplitudes: t.List[int]
-    tones_data: t.List[Tone]
+    tones: t.List[Tone]
 
     def __init__(
         self, *, trial_number: int, start_timestamp: np.float64, end_timestamp: np.float64, excluded: bool
@@ -58,7 +57,7 @@ class Trial:
         self.end_timestamp = end_timestamp
         self.excluded = excluded
         self.amplitudes = []
-        self.tones_data = []
+        self.tones = []
 
 
 class IncludedTrial(Trial):
@@ -86,10 +85,10 @@ class Session:
         int
             Number of trials in the session
         """
-        return len(self.trials_data)
+        return len(self.trials)
 
-    trials_data: t.List[Trial]
+    trials: t.List[Trial]
     # @todo: Add channel mapping, animal info, excluded trials, etc
 
     def __init__(self) -> None:
-        self.trials_data = []
+        self.trials = []
