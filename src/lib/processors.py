@@ -248,7 +248,7 @@ class SessionProcessor:
                 trial_start_timestamp,
                 trial_end_timestamp,
             )
-            trial = structures.IncludedTrial(
+            trial = structures.IncludedAcousticTrial(
                 trial_number=trial_number,
                 start_timestamp=trial_start_timestamp,
                 end_timestamp=trial_end_timestamp,
@@ -312,15 +312,15 @@ class SessionProcessor:
                     )
 
                 tone = structures.Tone(
-                    tone_start_relative_timestamp=stimulus_epoch_onsets[stimulus_epoch_idx] - trial_start_timestamp,
-                    tone_end_relative_timestamp=stimulus_epoch_offsets[stimulus_epoch_idx] - trial_start_timestamp,
-                    inter_tone_interval_end_relative_timestamp=(
+                    stimulus_start_relative_timestamp=stimulus_epoch_onsets[stimulus_epoch_idx] - trial_start_timestamp,
+                    stimulus_end_relative_timestamp=stimulus_epoch_offsets[stimulus_epoch_idx] - trial_start_timestamp,
+                    inter_stimulus_interval_end_relative_timestamp=(
                         stimulus_epoch_offsets[stimulus_epoch_idx] - trial_start_timestamp + self.inter_tone_interval
                     ),
-                    tone_start_timestamp=stimulus_epoch_onsets[stimulus_epoch_idx],
-                    tone_end_timestamp=stimulus_epoch_offsets[stimulus_epoch_idx],
+                    stimulus_start_timestamp=stimulus_epoch_onsets[stimulus_epoch_idx],
+                    stimulus_end_timestamp=stimulus_epoch_offsets[stimulus_epoch_idx],
                     # @todo: consider using the start of the next stim as the actual offset
-                    inter_tone_interval_end_timestamp=(
+                    inter_stimulus_interval_end_timestamp=(
                         stimulus_epoch_offsets[stimulus_epoch_idx] + self.inter_tone_interval
                     ),
                     frequency=acoustic_frequency,
@@ -328,8 +328,15 @@ class SessionProcessor:
                 )
 
                 stimulus_epoch_idx += 1
-                trial.tones.append(tone)
+                trial.stimuli.append(tone)
 
+            if trial.stimuli:
+                for stimulus in trial.stimuli:
+                    assert isinstance(stimulus, structures.Tone)
+                    trial.base_frequency = trial.base_frequency or stimulus.frequency
+                    if tone.frequency != trial.base_frequency:
+                        trial.alternate_frequency = tone.frequency
+                        break
             session.trials.append(trial)
         return session
 
@@ -362,36 +369,36 @@ class SessionProcessor:
                 continue
 
             assert isinstance(trial, structures.IncludedTrial)
-            in_tone_spike_counts = np.zeros((len(trial.tones), 32), np.uint)
-            out_tone_spike_counts = np.zeros((len(trial.tones), 32), np.uint)
+            in_stimulus_spike_counts = np.zeros((len(trial.stimuli), 32), np.uint)
+            out_stimulus_spike_counts = np.zeros((len(trial.stimuli), 32), np.uint)
 
-            for tone_idx, tone in enumerate(trial.tones):
+            for stimulus_idx, stimulus in enumerate(trial.stimuli):
 
                 spike_cumulator_range = structures.SpikeAccumulatorTimeRange(
-                    start=tone.tone_start_timestamp + self.in_tone_capture_start_offset,
-                    end=tone.tone_start_timestamp + self.in_tone_capture_end_offset,
+                    start=stimulus.stimulus_start_timestamp + self.in_tone_capture_start_offset,
+                    end=stimulus.stimulus_start_timestamp + self.in_tone_capture_end_offset,
                 )
 
                 while cspk_offset < cspk_length and cspk_data["ts"][cspk_offset] < spike_cumulator_range.start:
                     cspk_offset += 1
 
                 while cspk_offset < cspk_length and cspk_data["ts"][cspk_offset] < spike_cumulator_range.end:
-                    in_tone_spike_counts[tone_idx, cspk_data["chan"][cspk_offset][0] - 1] += 1
+                    in_stimulus_spike_counts[stimulus_idx, cspk_data["chan"][cspk_offset][0] - 1] += 1
                     cspk_offset += 1
 
                 spike_cumulator_range = structures.SpikeAccumulatorTimeRange(
-                    start=tone.tone_start_timestamp + self.tone_duration + self.out_tone_capture_start_offset,
-                    end=tone.tone_start_timestamp + self.tone_duration + self.out_tone_capture_end_offset,
+                    start=stimulus.stimulus_start_timestamp + self.tone_duration + self.out_tone_capture_start_offset,
+                    end=stimulus.stimulus_start_timestamp + self.tone_duration + self.out_tone_capture_end_offset,
                 )
 
                 while cspk_offset < cspk_length and cspk_data["ts"][cspk_offset] < spike_cumulator_range.start:
                     cspk_offset += 1
 
                 while cspk_offset < cspk_length and cspk_data["ts"][cspk_offset] < spike_cumulator_range.end:
-                    out_tone_spike_counts[tone_idx, cspk_data["chan"][cspk_offset][0] - 1] += 1
+                    out_stimulus_spike_counts[stimulus_idx, cspk_data["chan"][cspk_offset][0] - 1] += 1
                     cspk_offset += 1
 
-            trial.in_tone_spike_counts = in_tone_spike_counts
-            trial.out_tone_spike_counts = out_tone_spike_counts
+            trial.in_stimulus_spike_counts = in_stimulus_spike_counts
+            trial.out_stimulus_spike_counts = out_stimulus_spike_counts
 
         return session

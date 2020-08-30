@@ -1,7 +1,6 @@
+import contextlib
 import logging
 from datetime import datetime
-import contextlib
-
 
 # class Timer:
 #     def __init__(self, label: str, logger: logging.Logger):
@@ -13,6 +12,7 @@ import contextlib
 
 #     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
 #         self.logger.debug("Time for %s: %s", self.label, datetime.now() - self.start_time)
+
 
 @contextlib.contextmanager
 def timer(label: str, logger: logging.Logger) -> None:
