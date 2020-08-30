@@ -30,6 +30,10 @@ class Tone:
         attenuation: Attenuation (in dB) of the tone
     """
 
+    tone_start_relative_timestamp: np.float64
+    tone_end_relative_timestamp: np.float64
+    inter_tone_interval_end_relative_timestamp: np.float64
+
     tone_start_timestamp: np.float64
     tone_end_timestamp: np.float64
     inter_tone_interval_end_timestamp: np.float64
@@ -65,6 +69,11 @@ class IncludedTrial(Trial):
 
     in_tone_spike_counts: t.List[npt.NDArray[(t.Any,), np.int32]] = []
     out_tone_spike_counts: t.List[npt.NDArray[(t.Any,), np.int32]] = []
+
+    # # Raw spike timestamps in structure:
+    # #  in_tone_spike_timestamps[stimulus number][channel number][array of timestamps]
+    # in_tone_spike_timestamps: t.List[t.List[npt.NDArray[(t.Any, ), np.int32]]] = []
+    # out_tone_spike_timestamps: t.List[t.List[npt.NDArray[(t.Any, ), np.int32]]] = []
 
 
 class ExcludedTrial(Trial):
