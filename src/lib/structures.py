@@ -11,6 +11,63 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+class AcousticAttenuation(int):
+    pass
+
+
+class AcousticFrequency(int):
+    pass
+
+
+# @todo: How can `np.float64 == TdtTimestamp(...)` be made to fail type checking
+#
+# @todo: Make these actually work properly, because right now they don't even type check properly
+# and it is frustrating
+#
+# @todo: Check how much performance impact there is using these classes, cos it ain't zero
+class TdtTimestamp(np.float64):
+    """Wrapper type for TdtTimestamp to make sure they are used correctly"""
+
+    def __add__(self, other: "TdtRelativeTimestamp") -> "TdtTimestamp":
+        if isinstance(other, TdtRelativeTimestamp):
+            return TdtTimestamp(np.float64(self) + np.float64(other))
+        raise TypeError("Only TdtRelativeTimestamps can be added to TdtTimestamps")
+
+    def __sub__(
+        self, other: t.Union["TdtTimestamp", "TdtRelativeTimestamp"]
+    ) -> t.Union["TdtTimestamp", "TdtRelativeTimestamp"]:
+        if isinstance(other, TdtRelativeTimestamp):
+            return TdtTimestamp(np.float64(self) - np.float64(other))
+        elif isinstance(other, TdtTimestamp):
+            return TdtRelativeTimestamp(np.float64(self) - np.float64(other))
+        raise TypeError("Only TdtRelativeTimestamps or TdtTimestamps be subtracted from TdtTimestamps")
+
+
+class TdtRelativeTimestamp(np.float64):
+    """Wrapper type for TdtRelativeTimestamp to make sure they are used correctly"""
+
+    def __add__(
+        self, other: t.Union["TdtTimestamp", "TdtRelativeTimestamp"]
+    ) -> t.Union["TdtTimestamp", "TdtRelativeTimestamp"]:
+        if isinstance(other, TdtTimestamp):
+            return other + self
+        elif isinstance(other, TdtRelativeTimestamp):
+            return TdtRelativeTimestamp(np.float64(self) + np.float64(other))
+
+        raise TypeError("Only TdtRelativeTimestamps or TdtTimestamps be added to TdtRelativeTimestamps")
+
+    def __sub__(self, other: "TdtRelativeTimestamp") -> "TdtRelativeTimestamp":
+        if isinstance(other, TdtRelativeTimestamp):
+            return TdtRelativeTimestamp(np.float64(self) + np.float64(other))
+        raise TypeError("Only TdtRelativeTimestamps can be subtracted from to TdtRelativeTimestamps")
+
+    def __mul__(self, other: t.Any) -> "TdtRelativeTimestamp":
+        return TdtRelativeTimestamp(np.float64(self) * other)
+
+    def __div__(self, other: t.Any) -> "TdtRelativeTimestamp":
+        return TdtRelativeTimestamp(np.float64(self) / other)
+
+
 # Time range
 class SpikeAccumulatorTimeRange(t.NamedTuple):
     start: np.float64
@@ -32,13 +89,13 @@ class Stimulus:
         inter_stimulus_interval_end_timestamp: Ending timestamp in the block for the end of the inter-stimulus interval
     """
 
-    stimulus_start_timestamp: np.float64
-    stimulus_end_timestamp: np.float64
-    inter_stimulus_interval_end_timestamp: np.float64
+    stimulus_start_timestamp: TdtTimestamp
+    stimulus_end_timestamp: TdtTimestamp
+    inter_stimulus_interval_end_timestamp: TdtTimestamp
 
-    stimulus_start_relative_timestamp: np.float64
-    stimulus_end_relative_timestamp: np.float64
-    inter_stimulus_interval_end_relative_timestamp: np.float64
+    stimulus_start_relative_timestamp: TdtRelativeTimestamp
+    stimulus_end_relative_timestamp: TdtRelativeTimestamp
+    inter_stimulus_interval_end_relative_timestamp: TdtRelativeTimestamp
 
 
 @dataclass
@@ -51,16 +108,16 @@ class Tone(Stimulus):
         attenuation: Attenuation (in dB) of the tone
     """
 
-    frequency: t.Union[int, None]
-    attenuation: t.Union[int, None]
+    frequency: t.Union[AcousticFrequency, None]
+    attenuation: t.Union[AcousticAttenuation, None]
 
 
 class Trial:
     """Basic structure for a trial in a session"""
 
     trial_number: int
-    start_timestamp: np.float64
-    end_timestamp: np.float64
+    start_timestamp: TdtTimestamp
+    end_timestamp: TdtTimestamp
     excluded: bool
 
     stimuli: t.List[Stimulus]
@@ -69,9 +126,9 @@ class Trial:
 class AcousticTrial(Trial):
     """Acoustic Trial structure"""
 
-    base_frequency: t.Union[int, None]
-    alternate_frequency: t.Union[int, None]
-    amplitudes: t.List[int]
+    base_frequency: t.Union[AcousticFrequency, None]
+    alternate_frequency: t.Union[AcousticFrequency, None]
+    amplitudes: t.List[AcousticAttenuation]
 
     def __init__(
         self, *, trial_number: int, start_timestamp: np.float64, end_timestamp: np.float64, excluded: bool
@@ -90,8 +147,13 @@ class AcousticTrial(Trial):
 class IncludedTrial(Trial):
     """Holds data for a single trial of a session"""
 
-    in_stimulus_spike_counts: t.List[npt.NDArray[(t.Any,), np.int32]] = []
-    out_stimulus_spike_counts: t.List[npt.NDArray[(t.Any,), np.int32]] = []
+    # These are stored as [stimulus number][channel number]
+    # So to get the data for all channels on the first stimulus:
+    #  in_stimulus_spike_counts[0]
+    # To get the data for channel 10 on all stimuli:
+    #  in_stimulus_spike_counts[:, 9]
+    in_stimulus_spike_counts: npt.NDArray[(t.Any, t.Any), np.int32] = []
+    out_stimulus_spike_counts: npt.NDArray[(t.Any, t.Any), np.int32] = []
 
     # # Raw spike timestamps in structure:
     # #  in_tone_spike_timestamps[stimulus number][channel number][array of timestamps]

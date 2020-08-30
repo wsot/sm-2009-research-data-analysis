@@ -232,11 +232,12 @@ class SessionProcessor:
 
         session = structures.Session()
 
-        for trial_idx, trial_number, trial_start_timestamp, trial_end_timestamp in (
-            (idx + 1, int(trial_data[0]), trial_data[1], trial_data[2])
+        for trial_idx, trial_number, real_trial_start_timestamp, trial_start_timestamp, trial_end_timestamp in (
+            (idx + 1, int(trial_data[0]), trial_data[1], trial_data[2], trial_data[3])
             for idx, trial_data in enumerate(
                 zip(
                     trial_windows["epocs"][self.trial_epoch]["data"],
+                    trial_windows["epocs"][self.trial_epoch]["onset"],
                     trial_windows["time_ranges"][TIME_RANGE_ONSET_IDX],
                     trial_windows["time_ranges"][TIME_RANGE_OFFSET_IDX],
                 )
@@ -250,7 +251,7 @@ class SessionProcessor:
             )
             trial = structures.IncludedAcousticTrial(
                 trial_number=trial_number,
-                start_timestamp=trial_start_timestamp,
+                start_timestamp=real_trial_start_timestamp,
                 end_timestamp=trial_end_timestamp,
                 excluded=False,
             )
@@ -274,8 +275,8 @@ class SessionProcessor:
                     stimulus_epoch_idx,
                     stimulus_epoch_onsets[stimulus_epoch_idx],
                 )
-                acoustic_frequency: t.Union[int, None] = None
-                acoustic_attenuation: t.Union[int, None] = None
+                acoustic_frequency: t.Union[structures.AcousticFrequency, None] = None
+                acoustic_attenuation: t.Union[structures.AcousticAttenuation, None] = None
 
                 # Skip forward to the next possible matching acoustic attenuation and frequency epocs for that stimulus
                 while (
@@ -299,7 +300,7 @@ class SessionProcessor:
                     )
                     < EPOCH_TIMESTAMP_ERROR_MARGIN
                 ):
-                    acoustic_frequency = int(
+                    acoustic_frequency = structures.AcousticFrequency(
                         trial_windows["epocs"][self.acoustic_frequency_epoch]["data"][acoustic_frequency_epoch_idx]
                     )
 
@@ -307,20 +308,26 @@ class SessionProcessor:
                     abs(attenuation_epoch_onsets[attenuation_epoch_idx] - stimulus_epoch_onsets[stimulus_epoch_idx])
                     < EPOCH_TIMESTAMP_ERROR_MARGIN
                 ):
-                    acoustic_attenuation = int(
+                    acoustic_attenuation = structures.AcousticAttenuation(
                         trial_windows["epocs"][self.attenuation_epoch]["data"][attenuation_epoch_idx]
                     )
 
                 tone = structures.Tone(
-                    stimulus_start_relative_timestamp=stimulus_epoch_onsets[stimulus_epoch_idx] - trial_start_timestamp,
-                    stimulus_end_relative_timestamp=stimulus_epoch_offsets[stimulus_epoch_idx] - trial_start_timestamp,
-                    inter_stimulus_interval_end_relative_timestamp=(
-                        stimulus_epoch_offsets[stimulus_epoch_idx] - trial_start_timestamp + self.inter_tone_interval
+                    stimulus_start_relative_timestamp=structures.TdtRelativeTimestamp(
+                        stimulus_epoch_onsets[stimulus_epoch_idx] - real_trial_start_timestamp
                     ),
-                    stimulus_start_timestamp=stimulus_epoch_onsets[stimulus_epoch_idx],
-                    stimulus_end_timestamp=stimulus_epoch_offsets[stimulus_epoch_idx],
+                    stimulus_end_relative_timestamp=structures.TdtRelativeTimestamp(
+                        stimulus_epoch_offsets[stimulus_epoch_idx] - real_trial_start_timestamp
+                    ),
+                    inter_stimulus_interval_end_relative_timestamp=structures.TdtRelativeTimestamp(
+                        stimulus_epoch_offsets[stimulus_epoch_idx]
+                        - real_trial_start_timestamp
+                        + self.inter_tone_interval
+                    ),
+                    stimulus_start_timestamp=structures.TdtTimestamp(stimulus_epoch_onsets[stimulus_epoch_idx]),
+                    stimulus_end_timestamp=structures.TdtTimestamp(stimulus_epoch_offsets[stimulus_epoch_idx]),
                     # @todo: consider using the start of the next stim as the actual offset
-                    inter_stimulus_interval_end_timestamp=(
+                    inter_stimulus_interval_end_timestamp=structures.TdtTimestamp(
                         stimulus_epoch_offsets[stimulus_epoch_idx] + self.inter_tone_interval
                     ),
                     frequency=acoustic_frequency,
@@ -331,8 +338,11 @@ class SessionProcessor:
                 trial.stimuli.append(tone)
 
             if trial.stimuli:
+                attenuations: t.Set[int] = set()
                 for stimulus in trial.stimuli:
                     assert isinstance(stimulus, structures.Tone)
+                    if stimulus.attenuation:
+                        attenuations.add(stimulus.attenuation)
                     trial.base_frequency = trial.base_frequency or stimulus.frequency
                     if tone.frequency != trial.base_frequency:
                         trial.alternate_frequency = tone.frequency
@@ -375,8 +385,10 @@ class SessionProcessor:
             for stimulus_idx, stimulus in enumerate(trial.stimuli):
 
                 spike_cumulator_range = structures.SpikeAccumulatorTimeRange(
-                    start=stimulus.stimulus_start_timestamp + self.in_tone_capture_start_offset,
-                    end=stimulus.stimulus_start_timestamp + self.in_tone_capture_end_offset,
+                    start=stimulus.stimulus_start_timestamp
+                    + structures.TdtRelativeTimestamp(self.in_tone_capture_start_offset),
+                    end=stimulus.stimulus_start_timestamp
+                    + structures.TdtRelativeTimestamp(self.in_tone_capture_end_offset),
                 )
 
                 while cspk_offset < cspk_length and cspk_data["ts"][cspk_offset] < spike_cumulator_range.start:
@@ -387,8 +399,10 @@ class SessionProcessor:
                     cspk_offset += 1
 
                 spike_cumulator_range = structures.SpikeAccumulatorTimeRange(
-                    start=stimulus.stimulus_start_timestamp + self.tone_duration + self.out_tone_capture_start_offset,
-                    end=stimulus.stimulus_start_timestamp + self.tone_duration + self.out_tone_capture_end_offset,
+                    start=stimulus.stimulus_start_timestamp
+                    + structures.TdtRelativeTimestamp(self.tone_duration + self.out_tone_capture_start_offset),
+                    end=stimulus.stimulus_start_timestamp
+                    + structures.TdtRelativeTimestamp(self.tone_duration + self.out_tone_capture_end_offset),
                 )
 
                 while cspk_offset < cspk_length and cspk_data["ts"][cspk_offset] < spike_cumulator_range.start:
