@@ -80,9 +80,17 @@ def write_trial_header(
 
 def write_trial_data(trial: structures.Trial, worksheet: openpyxl.worksheet.worksheet.Worksheet, origin: Cell) -> Cell:
     assert isinstance(trial, structures.IncludedAcousticTrial)
-    write_row(itertools.chain(iter(("Frequency",)), (s.frequency for s in trial.stimuli)), worksheet, origin)
+    write_row(
+        itertools.chain(iter(("Frequency",)), (str(t.cast(structures.Tone, s).frequency) for s in trial.stimuli)),
+        worksheet,
+        origin,
+    )
     origin += Offset(0, 1)
-    write_row(itertools.chain(iter(("Attenuation",)), (s.attenuation for s in trial.stimuli)), worksheet, origin)
+    write_row(
+        itertools.chain(iter(("Attenuation",)), (str(t.cast(structures.Tone, s).attenuation) for s in trial.stimuli)),
+        worksheet,
+        origin,
+    )
     origin += Offset(0, 1)
     write_row(
         (str(round(t.stimulus_start_relative_timestamp, 2)) for t in trial.stimuli), worksheet, origin + Offset(1, 0)

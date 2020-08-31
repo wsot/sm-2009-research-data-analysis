@@ -28,8 +28,15 @@ def lint(ctx):
     """
     ctx.run("flake8 src")
 
+@invoke.task
+def test(ctx):
+    """
+    Run pytest
+    """
+    ctx.run("pytest")
 
-@invoke.task(format, typing, lint)
+
+@invoke.task(format, typing, lint, test)
 def check(ctx):
     """
     Runs all the code checking tools
