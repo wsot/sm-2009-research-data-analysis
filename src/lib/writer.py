@@ -64,7 +64,7 @@ def write_session_header(
 def write_trial_header(
     trial: structures.Trial, worksheet: openpyxl.worksheet.worksheet.Worksheet, origin: Cell
 ) -> Cell:
-    assert isinstance(trial, structures.AcousticTrial)
+    trial = t.cast(structures.AcousticTrial, trial)
     return write_cells(
         (
             ("Trial", str(trial.trial_number)),
@@ -79,7 +79,7 @@ def write_trial_header(
 
 
 def write_trial_data(trial: structures.Trial, worksheet: openpyxl.worksheet.worksheet.Worksheet, origin: Cell) -> Cell:
-    assert isinstance(trial, structures.IncludedAcousticTrial)
+    trial = t.cast(structures.IncludedAcousticTrial, trial)
     write_row(
         itertools.chain(iter(("Frequency",)), (str(t.cast(structures.Tone, s).frequency) for s in trial.stimuli)),
         worksheet,

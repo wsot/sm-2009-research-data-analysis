@@ -54,7 +54,6 @@ combine_as_imports = true
 default_section = "THIRDPARTY"
 known_third_party = []
 known_first_party = []
-not_skip = ["__init__.py"]
 known_standard_library = []
 skip = [".venv"]
 multi_line_output = 3

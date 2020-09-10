@@ -33,10 +33,10 @@ def test(ctx):
     """
     Run pytest
     """
-    ctx.run("pytest")
+    ctx.run("pytest --cov=lib --cov-report=term --cov-report=html --no-cov-on-fail")
 
 
-@invoke.task(format, typing, lint, test)
+@invoke.task(format, lint, test, typing)
 def check(ctx):
     """
     Runs all the code checking tools

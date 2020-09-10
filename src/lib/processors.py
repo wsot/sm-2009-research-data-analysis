@@ -1,5 +1,4 @@
 import logging
-import sys
 import typing as t
 
 import nptyping as npt
@@ -232,7 +231,7 @@ class SessionProcessor:
 
         session = structures.Session()
 
-        for trial_idx, trial_number, real_trial_start_timestamp, trial_start_timestamp, trial_end_timestamp in (
+        for _, trial_number, real_trial_start_timestamp, trial_start_timestamp, trial_end_timestamp in (
             (idx + 1, int(trial_data[0]), trial_data[1], trial_data[2], trial_data[3])
             for idx, trial_data in enumerate(
                 zip(
@@ -340,7 +339,7 @@ class SessionProcessor:
             if trial.stimuli:
                 attenuations: t.Set[int] = set()
                 for stimulus in trial.stimuli:
-                    assert isinstance(stimulus, structures.Tone)
+                    stimulus = t.cast(structures.Tone, stimulus)
                     if stimulus.attenuation:
                         attenuations.add(stimulus.attenuation)
                     trial.base_frequency = trial.base_frequency or stimulus.frequency
@@ -350,17 +349,26 @@ class SessionProcessor:
             session.trials.append(trial)
         return session
 
-    def extract_spikes_from_trial(self, *, from_trial_offset: float, to_trial_offset: float) -> structures.Session:
+    def extract_spikes_from_trial(
+        self,
+        *,
+        from_trial_offset: float,
+        to_trial_offset: float,
+        data_processors: t.Optional[t.Iterable[structures.DataProcessor]] = None,
+    ) -> structures.Session:
         """
         Extracts spike counts for each tone of each trial in the session
 
         Parameters
         ----------
-        from_trial_offset :
+        from_trial_offset
             Offset from trial start from which to include spike data per tone (negative for before trial start)
-        to_trial_offset :
+        to_trial_offset
             Offset from trial start until which to include spike data per tone
             (note: any incomplete tones at the end are not included)
+        data_processors
+            Iterable of DataProcessor implementations that each trial spike count data will be passed through
+            before storage. These are applied in the order they are received from iteration.
 
         Returns
         -------
@@ -372,13 +380,14 @@ class SessionProcessor:
         cspk_offset = 0
         cspk_data = self._trial_windows["snips"]["CSPK"]
         cspk_length = len(cspk_data["ts"])
-        np.set_printoptions(threshold=sys.maxsize)
+
+        data_processors = data_processors or []
 
         for trial in session.trials:
             if trial.excluded:
                 continue
 
-            assert isinstance(trial, structures.IncludedTrial)
+            trial = t.cast(structures.IncludedTrial, trial)
             in_stimulus_spike_counts = np.zeros((len(trial.stimuli), 32), np.uint)
             out_stimulus_spike_counts = np.zeros((len(trial.stimuli), 32), np.uint)
 
@@ -412,6 +421,9 @@ class SessionProcessor:
                     out_stimulus_spike_counts[stimulus_idx, cspk_data["chan"][cspk_offset][0] - 1] += 1
                     cspk_offset += 1
 
+            for data_processor in data_processors:
+                in_stimulus_spike_counts = data_processor.transform(in_stimulus_spike_counts)
+                out_stimulus_spike_counts = data_processor.transform(out_stimulus_spike_counts)
             trial.in_stimulus_spike_counts = in_stimulus_spike_counts
             trial.out_stimulus_spike_counts = out_stimulus_spike_counts
 

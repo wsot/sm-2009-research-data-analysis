@@ -236,7 +236,7 @@ class ChannelRemapper(DataProcessor):
         dst_channels_over_max = set()
 
         for src_channel, dst_channel in channel_map:
-            print(f"src channel: {src_channel}, dst_channel: {dst_channel}")
+            logging.debug("Mapping source channel %s to destination %s", src_channel, dst_channel)
             if src_channel > max_channel:
                 src_channels_over_max.add(str(src_channel))
             if dst_channel > max_channel:
@@ -298,7 +298,7 @@ class ChannelRemapper(DataProcessor):
         channel_map = []
         try:
             header_line = tuple(f.readline().strip().split("\t"))
-            if ("TDT", "Channel") != header_line:
+            if header_line not in (("TDT", "Mapping"), ("TDT", "Mapped")) != header_line:
                 raise ValueError(f"Invalid header line: {header_line}")
             for line in f:
                 src_channel, dst_channel = line.strip().split("\t")
@@ -307,3 +307,18 @@ class ChannelRemapper(DataProcessor):
             raise ValueError(f"Data structure of provided channel map is not valid: {e}")
 
         return cls(channel_map)
+
+    @classmethod
+    def from_autofind_in_path(
+        cls, path: pathlib.Path, mapping_filename_prefix: str = "channel map"
+    ) -> t.Union["ChannelRemapper", None]:
+        f: t.Optional[pathlib.Path] = None
+        for f in path.iterdir():
+            if f.is_file() and f.name.lower().startswith(mapping_filename_prefix.lower()):
+                break
+
+        if f is not None:
+            logger.info("Loading channel mappings from %s", f.name)
+            return cls.from_path(f)
+
+        return None
