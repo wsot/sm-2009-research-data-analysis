@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import typing as t
 from datetime import datetime
 
 # class Timer:
@@ -15,7 +16,7 @@ from datetime import datetime
 
 
 @contextlib.contextmanager
-def timer(label: str, logger: logging.Logger) -> None:
+def timer(label: str, logger: logging.Logger) -> t.Iterator[None]:
     start_time = datetime.now()
     yield
     logger.info("Time for %s: %s", label, datetime.now() - start_time)

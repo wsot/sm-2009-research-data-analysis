@@ -6,7 +6,7 @@ import numpy as np
 
 import tdt
 
-from . import structures, utils
+from . import data_processors, structures, utils
 
 logger = logging.getLogger(__name__)
 
@@ -354,7 +354,7 @@ class SessionProcessor:
         *,
         from_trial_offset: float,
         to_trial_offset: float,
-        data_processors: t.Optional[t.Iterable[structures.DataProcessor]] = None,
+        data_processors: t.Optional[t.Iterable[data_processors.BaseDataProcessor]] = None,
     ) -> structures.Session:
         """
         Extracts spike counts for each tone of each trial in the session
@@ -367,7 +367,7 @@ class SessionProcessor:
             Offset from trial start until which to include spike data per tone
             (note: any incomplete tones at the end are not included)
         data_processors
-            Iterable of DataProcessor implementations that each trial spike count data will be passed through
+            Iterable of BaseDataProcessor implementations that each trial spike count data will be passed through
             before storage. These are applied in the order they are received from iteration.
 
         Returns
