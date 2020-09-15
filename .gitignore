@@ -16,6 +16,7 @@ tdt-docs
 **/*.tmp
 **/pip-wheel-metadata
 **/htmlcov/
+**/htmlmypy/
 **/vendor
 **/.ipynb_checkpoints
 

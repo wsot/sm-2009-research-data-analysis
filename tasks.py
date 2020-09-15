@@ -18,8 +18,7 @@ def typing(ctx):
     """
     Check type annotations
     """
-    ctx.run("mypy src")
-
+    ctx.run("mypy src --html-report htmlmypy")
 
 @invoke.task
 def lint(ctx):
@@ -29,12 +28,15 @@ def lint(ctx):
     ctx.run("flake8 src")
 
 @invoke.task
-def test(ctx):
+def test(ctx, name=""):
     """
     Run pytest
     """
-    ctx.run("pytest --cov=lib --cov-report=term --cov-report=html --no-cov-on-fail")
-
+    if name:
+        ctx.run(f"pytest --no-cov -sk {name}", pty=True)
+    else:
+        ctx.run("pytest --cov=lib --cov-report=term --no-cov-on-fail --cov-context=test")
+        ctx.run("coverage html --show-contexts")
 
 @invoke.task(format, lint, test, typing)
 def check(ctx):

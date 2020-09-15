@@ -10,4 +10,4 @@ class BaseDataProcessor(abc.ABC):
 
     @abc.abstractmethod
     def transform(self, array: npt.NDArray[(t.Any, t.Any), t.Any]) -> npt.NDArray[(t.Any, t.Any), t.Any]:
-        pass
+        ...  # pragma: no cover

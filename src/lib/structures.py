@@ -1,11 +1,7 @@
 """
 Data structures for representing the processed data from testing/trials
 """
-import collections
-import enum
 import logging
-import pathlib
-import re
 import typing as t
 from dataclasses import dataclass
 
@@ -194,84 +190,3 @@ class Session:
 
     def __init__(self) -> None:
         self.trials = []
-
-
-class ExclusionDataType(enum.Enum):
-    NEURAL_DATA = 1
-    HR_DATA = 2
-
-
-class ExclusionTrialsType(enum.Enum):
-    ACOUSTIC_TRIALS = 1
-    ELECTRICAL_TRIALS = 2
-
-
-@dataclass
-class TrialExclusion:
-    data_types: t.List[ExclusionDataType]
-    trials_types: t.List[ExclusionTrialsType]
-    start_offset: TdtTimestamp
-    end_offset: t.Optional[TdtTimestamp]
-    reason: str
-
-    @classmethod
-    def from_autofind_in_path(
-        cls, path: pathlib.Path, exclusion_file_prefix: str = "exclude "
-    ) -> t.Iterable["TrialExclusion"]:
-
-        exclusions: t.List["TrialExclusion"] = []
-        exclusion_files_by_data_type: t.DefaultDict[ExclusionDataType, t.List[str]] = collections.defaultdict(list)
-        for p in path.parents:
-            for f in p.iterdir():
-                if f.is_file() and f.name.lower().startswith(exclusion_file_prefix.lower()):
-                    exclusion = cls.from_path(f)
-                    if exclusion is not None:
-                        exclusions.append(exclusion)
-                        for data_type in exclusion.data_types:
-                            exclusion_files_by_data_type[data_type].append(f.absolute().as_posix())
-
-        for k, v in exclusion_files_by_data_type.items():
-            if len(v) > 1:
-                logger.warning(f"More than one exclusion file for data type {k.name}: {', '.join(v)}")
-
-        return exclusions
-
-    @classmethod
-    def from_file(
-        cls, f: t.TextIO, data_types: t.List[ExclusionDataType], trials_types: t.List[ExclusionTrialsType]
-    ) -> "TrialExclusion":
-        start_offset = TdtTimestamp(0.0)
-        end_offset: t.Optional[TdtTimestamp] = None
-        reason: t.List[str] = []
-
-        first_line = f.readline()
-        matches = re.match(r"Exclude after:\s*(\d+)s", f.readline())
-        if matches:
-            start_offset = TdtTimestamp(np.float64(matches.group(1)))
-        else:
-            reason.append(first_line)
-
-        reason.extend(f)
-        reason_text = "\n".join(reason).strip()
-
-        return TrialExclusion(
-            data_types=data_types,
-            trials_types=trials_types,
-            start_offset=start_offset,
-            end_offset=end_offset,
-            reason=reason_text,
-        )
-
-    @classmethod
-    def from_path(cls, path: pathlib.Path) -> t.Optional["TrialExclusion"]:
-        data_types: t.List[ExclusionDataType] = []
-        trials_types: t.List[ExclusionTrialsType] = []
-        if "neural" in path.name.lower():
-            data_types.append(ExclusionDataType.NEURAL_DATA)
-        elif "aggregration" in path.name.lower():
-            return None
-        else:
-            logger.warning(f"Unknown exclusion type: {path.absolute}")
-
-        with path.open() as f:
-            return cls.from_file(f, data_types, trials_types)
